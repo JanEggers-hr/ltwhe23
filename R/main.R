@@ -22,6 +22,9 @@ setwd(this.path::this.dir())
 # Aus dem R-Verzeichnis eine Ebene rauf
 setwd("..")
 
+# Deutsche Zahlen, Daten, Datumsangaben
+Sys.setlocale(locale = "de_DE")
+
 # Lies Kommandozeilen-Parameter: 
 # (Erweiterte Funktion aus dem R.utils-Paket)
 TEST = TRUE
@@ -62,7 +65,16 @@ source("R/lies_konfiguration.R")
 # Funktionen einbinden
 # Das könnte man auch alles hier in diese Datei schreiben, aber ist es übersichtlicher
 
-source("R/lies_aktuellen_stand.R")
+check = tryCatch(
+  { # Bibliotheken
+    source("R/lies_aktuellen_stand.R")
+    source("R/aktualisiere_grafiken.R")
+  },
+  warning = function(w) {teams_warning(w,title=paste0(wahl_name,": Bibliotheksfunktionen?"))},
+  error = function(e) {teams_warning(e,title=paste0(wahl_name,": Bibliotheksfunktionen?"))}
+)  
+
+
 
 #---- MAIN ----
 # Vorbereitung
@@ -89,6 +101,7 @@ if (DO_PREPARE_MAPS) {
   } else { teams_warning("Lokaler Zyklus, keine Daten auf Google Bucket kopiert")}
   # Alle Grafiken auf CSV-und JSON-URL umbiegen
   fix_data(datawrapper_ids_df %>%  pull(dw_id))
+  gemeinde
 } 
 
 # Schleife.

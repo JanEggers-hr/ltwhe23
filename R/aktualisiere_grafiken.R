@@ -36,6 +36,17 @@ generiere_auszählungsbalken <- function(anz = gezaehlt,max_s = stimmbezirke_n,t
   
 }
 
+notes_text_auszaehlung <- function(anz = gezaehlt,max_s = stimmbezirke_n,ts = ts,...) {
+  sd <- as_datetime(startdatum)
+  if (ts >= sd) {
+    return(paste0(...,generiere_auszählungsbalken(anz,max_s,ts)))
+  } else {
+    return(paste0(...,
+                  "Auszählung beginnt am ",
+                  format(sd,"%A, %d. %B %Y, %H:%M Uhr")))
+  }
+}
+
 #---- Daten-Kopierfunktionen ----
 
 # Kopiere Livedaten-Ordner in das Google Bucket
@@ -132,16 +143,93 @@ kreise_direkt_saeulen <- function() {
   }
   
 }
+
   
-  
- 
-# Landesstimmen-Grafiken
-# Haben 3 Spalten (Partei, Veränderung, prozentplusminus)
+#' gemeinde_direkt_tabelle()
+#' 
+#' Passt die Metadaten der Landesstimmen-Grafiken an:
+#' - Farbtabelle für Barcharts in das Vorbild laden
+#' - Vorbild-Visualize-Metadaten klonen
+#' - Data-Daten klonen 
+#' - Daten überschreiben
+#' - Livedaten generieren
+#' Die haben 3 Spalten (Partei, Veränderung, prozentplusminus)
+gemeinde_direkt_tabelle <- function() {
+  # Vorbild-Metadaten laden
+  source_meta <- dw_retrieve_chart_metadata(dw_template4)
+  viz <- source_meta$content$metadata$visualize
+  # Farbliste mit allen Partei-IDs - ruhig die lange
+  farbliste <- setNames(as.list(partei_idx_df$farbwert), 
+                        parteien_idx_df$name)
+  viz[["columns"]][["stimmen"]][["customColorBarBackground"]] <- farbliste
+  viz[["columns"]][["stimmen"]][["customBarColorBy"]] <- "partei"
+  gemeinden_v <- gemeinden_alle_df %>% 
+    filter(!(AGS %in% staedte_v)) %>% 
+             pull(AGS)
+  for (g in gemeinden_v) {
+    # Hole den "letzten" (also den zweiten) Eintrag zu dieser AGS
+    fname <- datawrapper_ids_df %>% filter(id == g) %>% 
+      pull(fname) %>% last()
+    dw_id <- datawrapper_ids_df %>% filter(id == g) %>% 
+      pull(dw_id) %>% last()
+    gemeinde_name <- gemeinden_alle_df %>% filter(AGS == g) %>% pull(name)
+    wk <- gemeinden_alle_df %>% filter(AGS == g) %>% pull(wk)
+    wk_name <- gemeinden_alle_df %>% filter(AGS == g) %>% pull(wk_name)
+    
+    # Visual-Metadaten hochladen
+    old_metadata <- dw_retrieve_chart_metadata(dw_id) 
+    # Neuen Listeneintrag mit den visualize-Metadaten unter der id generieren
+    dat <- old_metadata$content$metadata$data
+    # Metadaten überschreiben
+    # Livedaten, URL in den Data-Zweig kopieren
+    dat[["upload-method"]]= "external-data"
+    dat[["external-data"]] = paste0("https://d.data.gcp.cloud.hr.de/livedaten/",
+                                    fname,
+                                    ".csv")
+    dat[["external-metadata"]] = paste0("https://d.data.gcp.cloud.hr.de/livedaten/",
+                                        fname,
+                                        ".json")
+    dat[["use-datawrapper-cdn"]] = FALSE
+    # 
+    dw_edit_chart(dw_id, data = dat, visualize = viz)
+
+    
+    title <- paste0(gemeinde_name, ": Landesstimmen")
+    intro <- paste0("Zweitstimmen in ",gemeinde_name,", alle Wahllisten, in der Reihenfolge vom Wahlzettel. ",
+                    "Werte in Klammern geben die Differenz zur letzten Wahl 2018 an.")
+    # Metadaten anlegen
+    forced_meta <- list()
+    forced_meta[["title"]] <- title
+    forced_meta[["describe"]][["intro"]] <- intro
+    forced_meta[["describe"]][["byline"]] <- "Jan Eggers/Sandra Kiefer"
+    forced_meta[["describe"]][["source-url"]] <- "Hessisches Statistisches Landesamt"
+    forced_meta[["describe"]][["source-name"]] <- "https://wahlen.hessen.de/landtagswahlen"
+    forced_meta[["annotate"]][["notes"]] <- notes_text_auszaehlung(0,0,as_datetime(startdatum) - days(1))
+      
+    # Liste in JSON - der force-Parameter ist nötig, weil R sonst darauf
+    # beharrt, dass es mit der S3-Klasse dw_chart nichts anfangen kann
+    # (obwohl die eine ganz normale Liste ist)
+    forced_meta_json <- toJSON(forced_meta,force=T)
+    write(forced_meta_json,
+          paste0("livedaten/",fname,".json"))
+    
+    # CSV anlegen
+    # Im Prinzip: Eine leere Parteienliste für den Wahlkreis
+    part_list_df <- parteien_listen_df %>%
+      mutate(stimmen = 0) %>%
+      mutate(prozent = "0,0% (+0)") %>% 
+      mutate(wk = wk) %>% 
+      select(partei,stimmen,prozent,wk) 
+    write_csv(kand_list_df,paste0("livedaten/",
+                                  fname,
+                                  ".csv"))
+    #---------- Letzte Aktion: Neu publizieren ----
+    dw_publish_chart(dw_id)
+  }
+}
+
 
 # Lies s
-source_meta <- dw_retrieve_chart_metadata("p6i6a")
-
-viz[["columns"]][["stimmen"]][["customColorBarBackground"]]
 
 
 #
@@ -170,12 +258,6 @@ copy_visuals <- function(dw_source,dw_id_v) {
 #' copy_fix_data 
 #' 
 #' @description 
-#' Kopiert die data-Metadaten von einer Vorlage-Grafik auf alle anderen in der Liste.
-#' Die sind vor allem für die Benennung und Verrechnung der Achsen nötig - aber haben
-#' sich als problematisch herausgestellt, wenn man sie setzt. 
-#' 
-#' Überschriebene Data-Einstellungen werden in einer Liste/als JSON gesichert. 
-#' 
 #' Holt sich die Dateinamen für die externen Quellen und überschreibt die Einstellungen
 #' so, dass das externe CSV / Metadaten-JSON gezogen wird. 
 fix_data <- function(dw_id_v) {
@@ -248,11 +330,11 @@ aktualisiere_gemeinden_landesstimmen <- function(live_df) {
   
 }
 
-aktualisiere_staedte_landesstimmen {
+aktualisiere_staedte_landesstimmen <- function(live_df){
   
 }
 
-aktualisiere_hessen_landesstimmen {
+aktualisiere_hessen_landesstimmen <- function(live_df){
   
 }
 

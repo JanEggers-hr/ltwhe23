@@ -262,4 +262,8 @@ direktkandidaten_df <- kandidaten_alle_df %>%
          Geburtsjahr, Geburtsort, Beruf,
          Listenplatz, Check_id)
 
+#--- MISC ---
+# Kassel, Darmstadt, Frankfurt, Wiesbaden - die KF mit mehr als einem Wahlkreis
+# Offenbach wird als Gemeinde in einem Wahlkreis behandelt (der halt nur eine Gemeinde hat)
+staedte_v <- c("611000","411000","412000","414000")
          

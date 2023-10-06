@@ -9,18 +9,19 @@ library(teamr)
 #' 
 #' Kommunikation mit Teams
 #' 
-#' Webhook wird als URL im Environment gespeichert. Wenn nicht dort, dann Datei im Nutzerverzeichnis ~/key/ einlesen.
+#' Webhook wird als URL im Environment gespeichert. Wenn nicht dort, dann Datei 
+#' webhook_ltwhe.key im Nutzerverzeichnis ~/key/ einlesen.
 #' MSG-Funktion schreibt alles in die Logdatei und auf den Bildschirm. (Vgl. Corona.)
 
 
 
 # Webhook schon im Environment? 
-if (Sys.getenv("WEBHOOK_OBWAHL") == "") {
-  t_txt <- read_file("~/key/webhook_obwahl.key")
-  Sys.setenv(WEBHOOK_REFERENDUM = t_txt)
+if (Sys.getenv("WEBHOOK_LTWHE") == "") {
+  t_txt <- read_file("~/key/webhook_ltwhe.key")
+  Sys.setenv(WEBHOOK_LTWHE= t_txt)
 }
 
-teams_meldung <- function(...,title="OB-Wahl-Update") {
+teams_meldung <- function(...,title="ltwhe-Update") {
   cc <- teamr::connector_card$new(hookurl = t_txt)
   if (TEST) {title <- paste0("TEST: ",title) }
   cc$title(paste0(title," - ",lubridate::with_tz(lubridate::now(),
