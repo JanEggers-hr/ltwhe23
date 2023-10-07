@@ -258,7 +258,7 @@ direktkandidaten_df <- kandidaten_alle_df %>%
   arrange(wk,p_id) %>% 
   mutate(name = paste0(Nachname," (",partei,")")) %>% 
   select(wk,wk_name = wkn,
-         name,farbwert,Titel,Nachname, Vorname, 
+         name,partei,farbwert,Titel,Nachname, Vorname, 
          Geburtsjahr, Geburtsort, Beruf,
          Listenplatz, Check_id)
 

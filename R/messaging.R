@@ -16,10 +16,10 @@ library(teamr)
 
 
 # Webhook schon im Environment? 
-if (Sys.getenv("WEBHOOK_LTWHE") == "") {
+if ((t_txt <- Sys.getenv("WEBHOOK_LTWHE")) == "") {
   t_txt <- read_file("~/key/webhook_ltwhe.key")
   Sys.setenv(WEBHOOK_LTWHE= t_txt)
-}
+} 
 
 teams_meldung <- function(...,title="ltwhe-Update") {
   cc <- teamr::connector_card$new(hookurl = t_txt)

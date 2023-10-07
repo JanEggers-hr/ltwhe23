@@ -23,12 +23,10 @@ setwd(this.path::this.dir())
 setwd("..")
 
 # Deutsche Zahlen, Daten, Datumsangaben
-Sys.setlocale(locale = "de_DE")
+Sys.setlocale(locale = "de_DE.UTF-8")
 
 # Lies Kommandozeilen-Parameter: 
 # (Erweiterte Funktion aus dem R.utils-Paket)
-TEST = TRUE
-DO_PREPARE_MAPS = FALSE
 # Kommandozeilen-Argumente
 args = R.utils::commandArgs(asValues = TRUE)
 if (length(args)!=0) { 
@@ -45,6 +43,8 @@ if (length(args)!=0) {
     if (!dir.exists(paste0("index/",wahl_name))) stop("Kein Index-Verzeichnis für ",wahl_name)
   }
 } 
+TEST = TRUE
+DO_PREPARE_MAPS = FALSE
 
 
 
@@ -119,21 +119,36 @@ while (gezaehlt < stimmbezirke_n) {
   if (ts_daten > ts) {
     ts <- ts_daten
     live_df <- hole_daten(stimmbezirke_url)
+    # Als erstes: Landesstimmen ganz Hessen
+    forme_hessen_landesstimmen(live_df) %>% 
+      aktualisiere_hessen_landesstimmen()
+    cat("Hessen aktualisiert")
     #
-    live_hessen_direkt_df <- hole_kreise_direkt(live_df)
-    aktualisiere_kreise_landesstimmen()
-    cat("Grafik Land aktualisiert\n")
+    live_kreise_direkt_lang_df <- forme_kreise_direkt(live_df)
+    write_csv(live_kreise_direkt_lang_df,"livedaten/kreise_direkt_lang.csv")
+    aktualisiere_kreise_direkt(live_kreise_direkt_lang_df)
+    cat("Grafiken Kreise-Direktstimmen CSV/JSON aktualisiert\n")
     #
-    aktualisiere_kreise_direkt(live_df)
-    aktualisiere_kreise_landesstimmen(live_df)
-    aktualisiere_gemeinden_direkt(live_df)
-    aktualisiere_gemeinden_landesstimmen(live_df)
-    aktualisiere_staedte_landesstimmen(live_df)
-    #
+    live_kreise_landesstimmen_lang_df <- forme_kreise_landesstimmen(live_df)
+    write_csv(live_kreise_landesstimmen_lang_df,"livedaten/kreise_landesstimmen_lang.csv")
+    aktualisiere_kreise_landesstimmen(live_kreise_landesstimmen_lang_df)
+    #---- Noch keine Testdaten für Gemeinden ----
+    
+    # live_gemeinden_direkt_lang_df <- forme_gemeinden_direkt(live_df)
+    # write_csv(live_gemeinden_direkt_lang_df,"livedaten/gemeinden_direkt_lang.csv")
+    # aktualisiere_gemeinden_direkt(live_gemeinden_direkt_lang_df)
+    # cat("Grafiken Gemeinde Direktstimmen CSV/JSON aktualisiert\n")
+    # #
+    # live_gemeinden_landesstimmen_lang_df <- forme_gemeinden_landesstimmen(live_df)
+    # write_csv(live_gemeinden_landesstimmen_lang_df,"livedaten/gemeinden_landesstimmen_lang.csv")
+    # # aktualisiere_staedte_landesstimmen(live_df) Schon mit drin
+    # cat("Grafiken Gemeinde Landesstimmen CSV/JSON aktualisiert\n")
+    # #
     cat("Aktualisierte Daten kopiert in",aktualisiere_bucket(),"\n")
     #
     neu_gezaehlt <- live_df %>% filter(Gebietstyp == "LD") %>% select(all_of(stimmbezirke_i)) %>% pull()
     # Nachricht neu gezählte Stimmbezirke
+    teams_meldung("Gezählte Stimmbezirke: ",neu_gezaehlt," (neu: ",neu_gezaehlt-gezaehlt,")")
     gezaehlt <- neu_gezaehlt
   } else {
     # Logfile erneuern und 30 Sekunden schlafen
