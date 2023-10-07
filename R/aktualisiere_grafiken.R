@@ -422,6 +422,17 @@ copy_visuals <- function(dw_source,dw_id_v) {
   return(meta_backup)
 }
 
+copy_column_names <- function(source_id,dw_id_v) {
+  meta <- dw_retrieve_chart_metadata(source_id)
+  dat_changes <- meta$content$metadata$data$changes
+  for (id in dw_id_v) {
+    meta <- dw_retrieve_chart_metadata(id)
+    dat <- meta$content$metadtata$data
+    dat$changes <- dat_changes
+    dw_edit_chart(id, data = dat)
+  }
+}
+
 #' fix_data 
 #' 
 #' @description 
@@ -475,8 +486,20 @@ fix_hide_wk <- function(id_v) {
   for (id in id_v) {
     meta <- dw_retrieve_chart_metadata(id)
     dat <- meta$content$metadata$data
-    data$`column-format`$wk$ignore <- TRUE
+    dat$`column-format`$wk$type <- 'auto'
+    dat$`column-format`$wk$`number-append` <- ''
+    dat$`column-format`$wk$`number-format` <- 'auto'
+    dat$`column-format`$wk$`number-divisor` <- 0
+    dat$`column-format`$wk$`number-prepend` <- ''
+    
+    dat$`column-format`$wk$ignore <- TRUE
     dw_edit_chart(chart_id = id, data = dat)
+  }
+}
+
+republish <- function(id_v){
+  for (id in id_v) {
+    dw_publish_chart(chart_id = id)
   }
 }
 
@@ -518,6 +541,9 @@ aktualisiere_kreise_direkt <- function(live_kreise_direkt_lang_df, wk_v = c(1:55
     # Spalte 142 und 143
     stimmbezirke <- wahlkreis_df %>% pull(stimmbezirke) %>% first()
     gezaehlt <- wahlkreis_df %>% pull(gezaehlt) %>% first()
+    waehler <- wahlkreis_df %>% pull(waehler) %>% first()
+    wahlberechtigt <- wahlkreis_df %>% pull(wahlberechtigt) %>% first()
+    ungueltig <- wahlkreis_df %>% pull(ungueltig) %>% first()
     wk <- i
     wk_name <- wahlkreis_df %>% pull(wk_name) %>% first()
     fname <- datawrapper_ids_df %>%  
@@ -534,6 +560,15 @@ aktualisiere_kreise_direkt <- function(live_kreise_direkt_lang_df, wk_v = c(1:55
                              fname,
                              ".csv"))
     # Metadaten einrichten: 
+    wahlbeteiligung_str <- paste0(
+      "Wahlbeteiligung: ",
+      formatC(waehler / wahlberechtigt * 100,format="f",
+             decimal.mark=",", digits = 1, big.mark="."),
+      " %, ungültige Stimmen ",
+      format(ungueltig / waehler * 100, format="f",
+             decimal.mark=",", digits = 1, big.mark="."),
+      " %<br><br>"
+    )
     kand_str <- paste0(kand_df %>% tail(nrow(.)-5) %>% 
                          mutate(n = paste0(name,": 0,0%")) %>% pull(n),
                        collapse = ", ")
@@ -541,8 +576,10 @@ aktualisiere_kreise_direkt <- function(live_kreise_direkt_lang_df, wk_v = c(1:55
                     " - ",wk_name,
                     ": Stimmen fürs Direktmandat",
                     ifelse(gezaehlt == stimmbezirke,""," - TREND"))
-    intro <- paste0("Erststimmen",
-                    " für die Wahl des Direktkandidaten des Wahlkreises ")
+    intro <- paste0(ifelse(gezaehlt == stimmbezirke, 
+                           wahlbeteiligung_str,
+                           ""),
+                    "Erststimmen für die Wahl des Direktkandidaten im Wahlkreis")
     notes <- notes_text_auszaehlung(gezaehlt,
                                     stimmbezirke, 
                                     ts,
@@ -589,6 +626,9 @@ aktualisiere_kreise_landesstimmen <- function(live_kreise_landesstimmen_lang_df)
     # Spalte 142 und 143
     stimmbezirke <- kreis_df %>% pull(stimmbezirke) %>% first()
     gezaehlt <- kreis_df %>% pull(gezaehlt) %>% first()
+    waehler <- kreis_df %>% pull(waehler) %>% first()
+    wahlberechtigt <- kreis_df %>% pull(wahlberechtigt) %>% first()
+    ungueltig <- kreis_df %>% pull(ungueltig) %>% first()
     # Dran denken: Bei Städten ist es mehr als einer, 
     wk <- w 
     wk_name <- kreis_df %>% pull(wk_name) %>% unique()
@@ -598,7 +638,7 @@ aktualisiere_kreise_landesstimmen <- function(live_kreise_landesstimmen_lang_df)
       filter(as.integer(id) == w) %>% 
       pull(fname) %>%
       # direkt ist der erste der beiden möglichen Werte
-      first()
+      last()
     liste_df <- kreis_df %>% 
       mutate(prozent = paste0(formatC(prozent,digits=1,format="f", 
                                       big.mark = ".",decimal.mark = ","),
@@ -610,6 +650,15 @@ aktualisiere_kreise_landesstimmen <- function(live_kreise_landesstimmen_lang_df)
     write_csv(liste_df,paste0("livedaten/",
                               fname,
                               ".csv"))
+    wahlbeteiligung_str <- paste0(
+      "Wahlbeteiligung: ",
+      formatC(waehler / wahlberechtigt * 100,format="f",
+              decimal.mark=",", digits = 1, big.mark="."),
+      " %, ungültige Stimmen ",
+      format(ungueltig / waehler * 100, format="f",
+             decimal.mark=",", digits = 1, big.mark="."),
+      " %<br><br>"
+    )
     # Metadaten einrichten: 
     title <- paste0("Wahlkreis ",wk,
                     " - ",wk_name,

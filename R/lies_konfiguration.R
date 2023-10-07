@@ -164,7 +164,8 @@ e2018_df <- read_delim("ergebnisse2018/wahlergebnisse2.csv",
   # Zeilen 1-2 enthalten Grütze, Zeile 3 enthält ganz Hessen
   filter(row_number()>2)
 
-
+# Spalte 28 und 57 enthalten die V-Partei3
+colnames(e2018_df) <- str_replace(colnames(e2018_df),"V-Partei3","V-Partei³")
 
 ### Spalten 14-32: Wahlkreisstimmen
 direkt_2018_df <- e2018_df %>%  
@@ -181,7 +182,7 @@ direkt_2018_df <- e2018_df %>%
   ) %>% 
   mutate(across(4:ncol(.), ~ as.numeric(.))) %>% 
   mutate(wahlbeteiligung = waehler / wahlberechtigt * 100,
-         ungueltig_prozent = gueltig / waehler * 100) %>%
+         ungueltig_prozent = 100 - (gueltig / waehler * 100)) %>%
   # Sonderbedingung: Ganz Hessen = "Wahlkreis 0"
   mutate(wk = if_else(is.na(wk),0,wk))
 

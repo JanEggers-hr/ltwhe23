@@ -81,8 +81,9 @@ check = tryCatch(
 gezaehlt <- 0 # Ausgezählte Stimmbezirke
 ts <- as_datetime(startdatum) # ts, Zeitstempel, der letzten gelesenen Daten
 
+# Anzahl Stimmbezirke bestimmen
 # Anzahl Stimmbezirke: einmal aus der Hessen-Zeile filtern 
-alte_daten <- hole_daten(stimmbezirke_url) # Leere Stimmbezirke
+alte_daten <- hole_daten(stimmbezirke_url, copy = FALSE) # Leere Stimmbezirke
 stimmbezirke_n <- alte_daten %>% filter(Gebietstyp == "LD") %>% select(all_of(stimmbezirke_i)) %>% pull()
 
 # Grafiken einrichten: Farbwerte und Switcher für die Karten
@@ -144,9 +145,9 @@ while (gezaehlt < stimmbezirke_n) {
     # # aktualisiere_staedte_landesstimmen(live_df) Schon mit drin
     # cat("Grafiken Gemeinde Landesstimmen CSV/JSON aktualisiert\n")
     # #
-    cat("Aktualisierte Daten kopiert in",aktualisiere_bucket(),"\n")
+    cat("Aktualisierte Daten kopiert in",aktualisiere_bucket_alle(),"\n")
     #
-    neu_gezaehlt <- live_df %>% filter(Gebietstyp == "LD") %>% select(all_of(stimmbezirke_i)) %>% pull()
+    neu_gezaehlt <- live_df %>% filter(Gebietstyp == "LD") %>% select(all_of(gezaehlt_i)) %>% pull()
     # Nachricht neu gezählte Stimmbezirke
     teams_meldung("Gezählte Stimmbezirke: ",neu_gezaehlt," (neu: ",neu_gezaehlt-gezaehlt,")")
     gezaehlt <- neu_gezaehlt

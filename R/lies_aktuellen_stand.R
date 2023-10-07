@@ -4,17 +4,21 @@
 
 #---- Hilfsfunktionen ----
 
-hole_daten <- function(stand_url,a_directory = "daten") {
+hole_daten <- function(stand_url,a_directory = "daten", copy=TRUE) {
   #' Schreibt das Dataframe mit den zuletzt geholten Stimmbezirks-Daten
   #' als Sicherungskopie in das angegebene Verzeichnis
   #' 
   if (!dir.exists(a_directory)) {
     dir.create(a_directory)
   }
-  
-  fname = paste0(a_directory,"/",
-                 str_replace_all(now(),"\\:","") %>% str_sub(1,15),
-                 ".csv")
+  if (copy) {
+    fname = paste0(a_directory,"/",
+                   str_replace_all(now(),"\\:","") %>% str_sub(1,15),
+                   ".csv")
+  } else {
+    fname = "livedaten/tmp.csv"
+    if (file.exists(fname)) { file.remove(fname)}
+  }
   # Bei Internet-Adresse: Daten aus dem Netz in den lokalen Ordner kopieren
   if (str_detect(stand_url,"^http")) {
     check = tryCatch(
@@ -27,7 +31,7 @@ hole_daten <- function(stand_url,a_directory = "daten") {
                                                         " kopieren nach ",fname))}
     )  
   } else {
-    R.utils::copyFile(stand_url,fname)
+     R.utils::copyFile(stand_url,fname) 
   }
   # Jetzt vom lokalen Laufwerk einlesen
   check = tryCatch(
@@ -43,6 +47,7 @@ hole_daten <- function(stand_url,a_directory = "daten") {
     warning = function(w) {teams_warning(w,title=paste0(wahl_name,": Datenakquise - Warnung beim Einlesen von ",fname))},
     error = function(e) {teams_warning(e,title=paste0(wahl_name,": Datenakquise - Fehler beim Einlesen von ",fname))}
   )
+  if (file.exists("livedaten/tmp.csv")) { file.remove("livedaten/tmp.csv")}
   return(tmp_df)
 }
 
