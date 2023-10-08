@@ -5,9 +5,12 @@
 .DS_Store
 .gitignore
 algorithmwatch
+ltwhe.log
+ltwhe_success.log
+ltwhe_crash.log
 obwahl.log
 obwahl_success.log
-projektplanung.md
 projekt
 kandidaten
 livedaten
+R/Vorbereitung

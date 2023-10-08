@@ -298,7 +298,7 @@ forme_gemeinden_landesstimmen <- function(live_df) {
     # (die ja idR mehrere Wahlkreise umfassen)
     # Entweder die Namen aus der gemeinden_alle nach AGS reinjoinen, oder
     # Sonderbedingung für Offenbach. 
-    select(wk = 1,
+    select(gs = 1,
            g_name = 2, 
            stimmbezirke = all_of(stimmbezirke_i),
            gezaehlt = all_of(gezaehlt_i), 
@@ -311,12 +311,12 @@ forme_gemeinden_landesstimmen <- function(live_df) {
            all_of(spaltenindex_landesstimmen_df$idx)
     ) %>% 
     # Nur die Parteien von den Landeslisten
-    pivot_longer(cols = 11:31,names_to="partei",values_to ="stimmen")  %>%
+    pivot_longer(cols = 11:31,names_to="partei",values_to ="stimmen") %>%
     # NA in den Stimmenzähl-Spalten und den Parteistimmen-Spalten tilgen
     mutate(across(c(5:10,12), ~ ifelse(is.na(.),0,.))) %>% 
     # AGS und Wahlkreis aus dem Gebietsschlüssel extrahieren
-    mutate(AGS = str_sub(wk,4,9)) %>% 
-    mutate(wk = as.integer(str_sub(wk,1,3))) %>%
+    mutate(AGS = str_sub(gs,4,9)) %>% 
+    mutate(wk = as.integer(str_sub(gs,1,3))) %>%
     # Offenbach korrigieren
     mutate(wk = ifelse(AGS == "413000",43,wk)) %>% 
     # Namen aus der Namenstabelle überschreibt "Hans-Stadten-Stadt" etc.
@@ -329,7 +329,7 @@ forme_gemeinden_landesstimmen <- function(live_df) {
     mutate(prozent = ifelse (stimmen == 0,0,stimmen/gueltig*100)) %>% 
     # Ergänze 2018er Ergebnisse aus der "Frankentabelle" (Kombination direkte und umgerechnete WK)
     left_join(frankentable_landesstimmen_lang_df,by=c("wk","partei")) %>% 
-    group_by(wk) %>% 
+    group_by(gs) %>% 
     fill(wahlberechtigte_2018:veraendert) %>% 
     ungroup() %>% 
     mutate(across(c(stimmen_2018,prozent_2018), ~ ifelse(is.na(.),0,.)))   %>% 

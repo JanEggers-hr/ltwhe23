@@ -90,17 +90,20 @@ gemeinden_2018_df <- e2018_df %>%
 
 g_direkt_lang_2018_df <- e2018_df %>% filter(nchar(GKZ) == 6) %>% 
   select(ags = GKZ,
-         14:32) %>% 
-  pivot_longer(cols = 2:19, names_to = "partei", values_to ="stimmen_2018") %>% 
+         14:32)%>% 
+  pivot_longer(cols = 2:20, names_to = "partei", values_to ="stimmen_2018") %>% 
   mutate(partei = str_replace(partei,"\\.\\.\\..+","")) %>% 
-  mutate(stimmen_2018 = as.integer(stimmen_2018))
+  mutate(stimmen_2018 = as.integer(stimmen_2018)) %>%
+  mutate(stimmen_2018 = ifelse(is.na(stimmen_2018),0,stimmen_2018))
   
 g_landesstimmen_lang_2018_df <- e2018_df %>% filter(nchar(GKZ) == 6) %>% 
   select(ags = GKZ,
          35:57) %>% 
   pivot_longer(cols = 2:24, names_to = "partei", values_to ="stimmen_2018") %>% 
   mutate(partei = str_replace(partei,"\\.\\.\\..+","")) %>% 
-  mutate(stimmen_2018 = as.integer(stimmen_2018))
+  mutate(stimmen_2018 = as.integer(stimmen_2018)) %>% 
+  mutate(stimmen_2018 = ifelse(is.na(stimmen_2018),0,stimmen_2018))
+
 
 
 parteien_v <- function(ags) {
@@ -117,22 +120,25 @@ while(hessen_df %>%
   # Splitte Vorlage in Hessen, Kreise, Gemeinden
   # Jetzt Zufallszahlen
   print(i)
-  factor = (i / 5) + runif(1,0,1/5)
+  factor <- function() { return(i/5 +runif(1,0,1/5)) }
   kreise_df <- vorlage_df %>% filter(Gebietstyp == "WK") %>% 
     mutate(wk = as.integer(str_sub(Gebietsschlüssel,1,3))) %>% 
     # Wahllokale ausgezählt - Zufall, aber immer ein Fünftel mehr
-    mutate(`Anzahl Wahlbezirke ausgezählt` = floor(`Anzahl Wahlbezirke` * factor)) %>% 
+    mutate(`Anzahl Wahlbezirke ausgezählt` = floor(`Anzahl Wahlbezirke` * factor())) %>% 
+    mutate(`Anzahl Wahlbezirke ausgezählt` = ifelse(`Anzahl Wahlbezirke ausgezählt` > `Anzahl Wahlbezirke`,
+                                                    `Anzahl Wahlbezirke`,
+                                                    `Anzahl Wahlbezirke ausgezählt`)) %>% 
     left_join(kreise_2018_df,by = "wk") %>% 
     mutate(Wahlberechtigte = wahlberechtigte2018,
-      `Wählerinnen und Wähler`= floor(waehler2018 * factor),
-      `Wählerinnen und Wähler mit Wahlschein` = floor(wahlschein2018 * factor),
+      `Wählerinnen und Wähler`= floor(waehler2018 * factor()),
+      `Wählerinnen und Wähler mit Wahlschein` = floor(wahlschein2018 * factor()),
       # Wahlbeteiligung später
-      `ungültige Wahlkreisstimmen` = floor(ungueltige2018 * factor),
+      `ungültige Wahlkreisstimmen` = floor(ungueltige2018 * factor()),
       #gültig später
     ) %>% 
     mutate(Wahlbeteiligung = `Wählerinnen und Wähler` / Wahlberechtigte *100,
            `gültige Wahlkreisstimmen` = `Wählerinnen und Wähler` - `ungültige Wahlkreisstimmen`) %>% 
-    mutate(`ungültige Landesstimmen` =  floor(ungueltige_l_2018 * factor)) %>% 
+    mutate(`ungültige Landesstimmen` =  floor(ungueltige_l_2018 * factor())) %>% 
     mutate(`gültige Landesstimmen` = `Wählerinnen und Wähler` - `ungültige Landesstimmen`) %>% 
     # Parteien ins Langformat bringen
     pivot_longer(cols = 18:46,names_to ="partei", values_to = "stimmen") %>% 
@@ -141,7 +147,7 @@ while(hessen_df %>%
                 mutate(partei = paste0(partei," Wahlkreisstimmen")) %>% 
                 select(wk,partei,stimmen_2018), by=c("wk","partei")) %>% 
     # Errechne Zufallsanteil
-    mutate(stimmen = floor(stimmen_2018 * factor)) %>%
+    mutate(stimmen = floor(stimmen_2018 * factor())) %>%
     select(-stimmen_2018,wk) %>% 
     # Zurück ins Querformat, Zusatzspalten weg
     pivot_wider(names_from = partei, values_from = stimmen)  %>% 
@@ -159,7 +165,7 @@ while(hessen_df %>%
                 mutate(partei = paste0(partei," Landesstimmen")) %>% 
                 select(wk,partei,stimmen_2018), by=c("wk","partei"))  %>% 
     # Errechne Zufallsanteil
-    mutate(stimmen = floor(stimmen_2018 * factor)) %>%
+    mutate(stimmen = floor(stimmen_2018 * factor())) %>%
     select(-stimmen_2018,wk) %>% 
     # Zurück ins Querformat, Zusatzspalten weg
     pivot_wider(names_from = partei, values_from = stimmen) %>% 
@@ -173,18 +179,21 @@ while(hessen_df %>%
   gemeinden_df <- vorlage_df %>% filter(Gebietstyp %in% c("VF","KS")) %>% 
     mutate(ags = as.integer(str_sub(Gebietsschlüssel,4,9))) %>% 
     # Wahllokale ausgezählt - Zufall, aber immer ein Fünftel mehr
-    mutate(`Anzahl Wahlbezirke ausgezählt` = floor(`Anzahl Wahlbezirke` * factor)) %>% 
+    mutate(`Anzahl Wahlbezirke ausgezählt` = floor(`Anzahl Wahlbezirke` * factor())) %>% 
+    mutate(`Anzahl Wahlbezirke ausgezählt` = ifelse(`Anzahl Wahlbezirke ausgezählt` > `Anzahl Wahlbezirke`,
+                                                    `Anzahl Wahlbezirke`,
+                                                    `Anzahl Wahlbezirke ausgezählt`)) %>% 
     left_join(gemeinden_2018_df,by = "ags") %>% 
     mutate(Wahlberechtigte = wahlberechtigte2018,
-           `Wählerinnen und Wähler`= floor(waehler2018 * factor),
-           `Wählerinnen und Wähler mit Wahlschein` = floor(wahlschein2018 * factor),
+           `Wählerinnen und Wähler`= floor(waehler2018 * factor()),
+           `Wählerinnen und Wähler mit Wahlschein` = floor(wahlschein2018 * factor()),
            # Wahlbeteiligung später
-           `ungültige Wahlkreisstimmen` = floor(ungueltige2018 * factor),
+           `ungültige Wahlkreisstimmen` = floor(ungueltige2018 * factor()),
            #gültig später
     ) %>% 
     mutate(Wahlbeteiligung = `Wählerinnen und Wähler` / Wahlberechtigte *100,
            `gültige Wahlkreisstimmen` = `Wählerinnen und Wähler` - `ungültige Wahlkreisstimmen`) %>% 
-    mutate(`ungültige Landesstimmen` =  floor(ungueltige_l_2018 * factor)) %>% 
+    mutate(`ungültige Landesstimmen` =  floor(ungueltige_l_2018 * factor())) %>% 
     mutate(`gültige Landesstimmen` = `Wählerinnen und Wähler` - `ungültige Landesstimmen`) %>% 
     # Parteien ins Langformat bringen
     pivot_longer(cols = 18:46,names_to ="partei", values_to = "stimmen") %>% 
@@ -193,7 +202,7 @@ while(hessen_df %>%
     # rowwise() %>% 
     # mutate(pv = list(parteien_v(ags))) %>% 
     # ungroup() %>% 
-    # mutate(partei = str_replace(partei," Wahlkreisstimmen","")) %>% 
+    mutate(partei = str_replace(partei," Wahlkreisstimmen","")) %>% 
     # mutate(p_exists = (partei %in% pv[[1]])) %>% 
     # filter(p_exists) %>% 
     # select(-p_exists,-pv) %>% 
@@ -201,9 +210,10 @@ while(hessen_df %>%
     left_join(g_direkt_lang_2018_df %>%  
                 select(ags,partei,stimmen_2018), by=c("ags","partei")) %>% 
     # Errechne Zufallsanteil
-    mutate(stimmen = floor(stimmen_2018 * factor)) %>%
+    mutate(stimmen = floor(stimmen_2018 * factor())) %>%
     select(-stimmen_2018) %>% 
-    # Zurück ins Querformat, Zusatzspalten weg
+    # Zurück ins Querformat, Zusatzspalten weg, Namen wieder normalisieren
+    mutate(partei = paste0(partei," Wahlkreisstimmen")) %>% 
     pivot_wider(names_from = partei, values_from = stimmen)  %>% 
     # Zurücksortieren
     select(1:17,
@@ -215,12 +225,14 @@ while(hessen_df %>%
     mutate(ags = as.integer(str_sub(Gebietsschlüssel,4,9))) %>% 
     pivot_longer(cols = 80:108,names_to ="partei", values_to = "stimmen") %>% 
     # Reale Ergebnisse 2018 nach Direktmandat/Partei
+    mutate(partei = str_replace(partei," Landesstimmen","")) %>% 
     left_join(g_landesstimmen_lang_2018_df %>%  
                 select(ags,partei,stimmen_2018), by=c("ags","partei"))  %>% 
     # Errechne Zufallsanteil
-    mutate(stimmen = floor(stimmen_2018 * factor)) %>%
+    mutate(stimmen = floor(stimmen_2018 * factor())) %>%
     select(-stimmen_2018,ags) %>% 
-    # Zurück ins Querformat, Zusatzspalten weg
+    # Zurück ins Querformat, Zusatzspalten weg, Namen wieder Normalisieren
+    mutate(partei = paste0(partei,(" Landesstimmen"))) %>% 
     pivot_wider(names_from = partei, values_from = stimmen) %>% 
     # Zurücksortieren
     select(1:79,

@@ -28,6 +28,9 @@ Sys.setlocale(locale = "de_DE.UTF-8")
 # Lies Kommandozeilen-Parameter: 
 # (Erweiterte Funktion aus dem R.utils-Paket)
 # Kommandozeilen-Argumente
+TEST = TRUE
+DO_PREPARE_MAPS = FALSE
+
 args = R.utils::commandArgs(asValues = TRUE)
 if (length(args)!=0) { 
   if (any(c("h","help","HELP") %in% names(args))) {
@@ -43,14 +46,12 @@ if (length(args)!=0) {
     if (!dir.exists(paste0("index/",wahl_name))) stop("Kein Index-Verzeichnis für ",wahl_name)
   }
 } 
-TEST = TRUE
-DO_PREPARE_MAPS = FALSE
 
 
 
 # Logfile anlegen, wenn kein Test
 if (!TEST) {
-  logfile = file("obwahl.log")
+  logfile = file("ltwhe.log")
   sink(logfile, append=T)
   sink(logfile, append=T, type="message")
 }
@@ -101,8 +102,9 @@ if (DO_PREPARE_MAPS) {
     cat("Operation took ",copy_time)
   } else { teams_warning("Lokaler Zyklus, keine Daten auf Google Bucket kopiert")}
   # Alle Grafiken auf CSV-und JSON-URL umbiegen
-  fix_data(datawrapper_ids_df %>%  pull(dw_id))
-  gemeinde
+  fix_dwcdn(datawrapper_ids_df %>%  pull(dw_id))
+  # Alle nochmal publizieren
+  republish(datawrapper_ids_df %>%  pull(dw_id))
 } 
 
 # Schleife.
@@ -133,18 +135,22 @@ while (gezaehlt < stimmbezirke_n) {
     live_kreise_landesstimmen_lang_df <- forme_kreise_landesstimmen(live_df)
     write_csv(live_kreise_landesstimmen_lang_df,"livedaten/kreise_landesstimmen_lang.csv")
     aktualisiere_kreise_landesstimmen(live_kreise_landesstimmen_lang_df)
-    #---- Noch keine Testdaten für Gemeinden ----
+    # Kreisdaten pushen (220 Dateien; geht schnell)
+    # Werden danach in Ordner /livedaten_backup verschoben
+    aktualisiere_bucket_kreise()
+    #---- Gemeinden schreiben ----
     
-    # live_gemeinden_direkt_lang_df <- forme_gemeinden_direkt(live_df)
-    # write_csv(live_gemeinden_direkt_lang_df,"livedaten/gemeinden_direkt_lang.csv")
-    # aktualisiere_gemeinden_direkt(live_gemeinden_direkt_lang_df)
-    # cat("Grafiken Gemeinde Direktstimmen CSV/JSON aktualisiert\n")
-    # #
-    # live_gemeinden_landesstimmen_lang_df <- forme_gemeinden_landesstimmen(live_df)
-    # write_csv(live_gemeinden_landesstimmen_lang_df,"livedaten/gemeinden_landesstimmen_lang.csv")
-    # # aktualisiere_staedte_landesstimmen(live_df) Schon mit drin
-    # cat("Grafiken Gemeinde Landesstimmen CSV/JSON aktualisiert\n")
-    # #
+    live_gemeinden_direkt_lang_df <- forme_gemeinden_direkt(live_df)
+    write_csv(live_gemeinden_direkt_lang_df,"livedaten/gemeinden_direkt_lang.csv")
+    aktualisiere_gemeinden_direkt(live_gemeinden_direkt_lang_df)
+    cat("Grafiken Gemeinde Direktstimmen CSV/JSON aktualisiert\n")
+    #
+    live_gemeinden_landesstimmen_lang_df <- forme_gemeinden_landesstimmen(live_df)
+    write_csv(live_gemeinden_landesstimmen_lang_df,"livedaten/gemeinden_landesstimmen_lang.csv")
+    aktualisiere_gemeinden_landesstimmen(live_gemeinden_landesstimmen_lang_df)
+    # aktualisiere_staedte_landesstimmen(live_df) Schon mit drin
+    cat("Grafiken Gemeinde Landesstimmen CSV/JSON aktualisiert\n")
+    #
     cat("Aktualisierte Daten kopiert in",aktualisiere_bucket_alle(),"\n")
     #
     neu_gezaehlt <- live_df %>% filter(Gebietstyp == "LD") %>% select(all_of(gezaehlt_i)) %>% pull()
@@ -153,9 +159,9 @@ while (gezaehlt < stimmbezirke_n) {
     gezaehlt <- neu_gezaehlt
   } else {
     # Logfile erneuern und 30 Sekunden schlafen
-    system("touch obwahl.log")
+    system("touch ltwhe.log")
     if (TEST) cat("Warte...\n")
-    Sys.sleep(30)
+    Sys.sleep(60)
   }
 }
 # Titel der Grafik "top" umswitchen
@@ -167,7 +173,7 @@ if (!TEST) {
   cat("OK: FERTIG - alle Stimmbezirke ausgezählt: ",as.character(ts),"\n")
   sink()
   sink(type="message")
-  file.rename("obwahl.log","obwahl_success.log")
+  file.rename("ltwhe.log","ltwhe_success.log")
 }
 teams_meldung(wahl_name," erfolgreich abgeschlossen.")
 
