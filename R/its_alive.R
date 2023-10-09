@@ -25,7 +25,7 @@ ts = now()
 # Gibt es überhaupt eine Logdatei? 
 
 if (file.exists("ltwhe.log")) {
-  metadaten <- file.info("ltwhel.log")
+  metadaten <- file.info("ltwhe.log")
   # Berechne Alter der Logdatei in Sekunden
   alter = as.integer(difftime(ts,metadaten$mtime,units="secs"))
   if (alter > max_alter)
@@ -37,5 +37,5 @@ if (file.exists("ltwhe.log")) {
   }
 } else {
   # Tue nichts.
-  cat("its_alive.R: ltwehe.log im Arbeitsverzeichnis",getwd(),"nicht gefunden")
+  cat("its_alive.R: ltwhe.log im Arbeitsverzeichnis",getwd(),"nicht gefunden")
 }

@@ -14,6 +14,7 @@ p_load(openxlsx)
 p_load(R.utils)
 p_load(utils)
 p_load(jsonlite)
+p_load(xtable)
 
 rm(list=ls())
 
@@ -28,24 +29,27 @@ Sys.setlocale(locale = "de_DE.UTF-8")
 # Lies Kommandozeilen-Parameter: 
 # (Erweiterte Funktion aus dem R.utils-Paket)
 # Kommandozeilen-Argumente
-TEST = TRUE
+TEST = FALSE
 DO_PREPARE_MAPS = FALSE
 
-args = R.utils::commandArgs(asValues = TRUE)
-if (length(args)!=0) { 
-  if (any(c("h","help","HELP") %in% names(args))) {
-    cat("Parameter: \n",
-        "--TEST schaltet Testbetrieb ein\n",
-        "--DO_PREPARE_MAPS schaltet Generierung der Switcher ein\n",
-        "wahl_name=<name> holt Index-Dateien aus dem Verzeichnis ./index/<name>\n\n")
-  }
-  TEST <- "TEST" %in% names(args)
-  DO_PREPARE_MAPS <- "DO_PREPARE_MAPS" %in% names(args)
-  if ("wahl_name" %in% names(args)) {
-    wahl_name <- args[["wahl_name"]]
-    if (!dir.exists(paste0("index/",wahl_name))) stop("Kein Index-Verzeichnis für ",wahl_name)
-  }
-} 
+# Läufst du auf dem Server?
+if (dir.exists("/home/jan_eggers_hr_de")) {
+  args = R.utils::commandArgs(asValues = TRUE)
+  if (length(args)!=0) { 
+    if (any(c("h","help","HELP") %in% names(args))) {
+      cat("Parameter: \n",
+          "--TEST schaltet Testbetrieb ein\n",
+          "--DO_PREPARE_MAPS schaltet Generierung der Switcher ein\n",
+          "wahl_name=<name> holt Index-Dateien aus dem Verzeichnis ./index/<name>\n\n")
+    }
+    TEST <- "TEST" %in% names(args)
+    DO_PREPARE_MAPS <- "DO_PREPARE_MAPS" %in% names(args)
+    if ("wahl_name" %in% names(args)) {
+      wahl_name <- args[["wahl_name"]]
+      if (!dir.exists(paste0("index/",wahl_name))) stop("Kein Index-Verzeichnis für ",wahl_name)
+    }
+  } 
+}
 
 
 
@@ -84,8 +88,20 @@ ts <- as_datetime(startdatum) # ts, Zeitstempel, der letzten gelesenen Daten
 
 # Anzahl Stimmbezirke bestimmen
 # Anzahl Stimmbezirke: einmal aus der Hessen-Zeile filtern 
-alte_daten <- hole_daten(stimmbezirke_url, copy = FALSE) # Leere Stimmbezirke
-stimmbezirke_n <- alte_daten %>% filter(Gebietstyp == "LD") %>% select(all_of(stimmbezirke_i)) %>% pull()
+alte_daten_df <- hole_daten(stimmbezirke_url, copy = FALSE) # Leere Stimmbezirke
+stimmbezirke_n <- alte_daten_df %>% filter(Gebietstyp == "LD") %>% select(all_of(stimmbezirke_i)) %>% pull()
+
+# Alte Daten nutzen, um festzuhalten, wer neu ausgezählt ist
+
+fertig_df <- alte_daten_df %>% select(Gebietsschlüssel,
+                                      name = Gebietsbezeichnung,
+                                      typ = Gebietstyp,
+                                      gemeldet = freigegeben,
+                                      g = `Anzahl Wahlbezirke`,
+                                      s = `Anzahl Wahlbezirke ausgezählt`) %>%
+  filter(typ %in% c("VF","KS","WK")) %>% 
+  mutate(gemeldet = (g==s)) %>% 
+  select(Gebietsschlüssel,name,typ,gemeldet) 
 
 # Grafiken einrichten: Farbwerte und Switcher für die Karten
 # Richtet auch die globale Variable switcher ein, deshalb brauchen wir sie
@@ -122,6 +138,9 @@ while (gezaehlt < stimmbezirke_n) {
   if (ts_daten > ts) {
     ts <- ts_daten
     live_df <- hole_daten(stimmbezirke_url)
+    # Es könnte theoretisch sein, dass die Stimmbezirks-Zahl sich durch
+    # Zusammenlegung verändert
+    stimmbezirke_n <- live_df %>% filter(Gebietstyp == "LD") %>% select(all_of(stimmbezirke_i)) %>% pull()
     # Als erstes: Landesstimmen ganz Hessen
     forme_hessen_landesstimmen(live_df) %>% 
       aktualisiere_hessen_landesstimmen()
@@ -149,13 +168,29 @@ while (gezaehlt < stimmbezirke_n) {
     write_csv(live_gemeinden_landesstimmen_lang_df,"livedaten/gemeinden_landesstimmen_lang.csv")
     aktualisiere_gemeinden_landesstimmen(live_gemeinden_landesstimmen_lang_df)
     # aktualisiere_staedte_landesstimmen(live_df) Schon mit drin
+    aktualisiere_bucket_gemeinden()
     cat("Grafiken Gemeinde Landesstimmen CSV/JSON aktualisiert\n")
     #
     cat("Aktualisierte Daten kopiert in",aktualisiere_bucket_alle(),"\n")
     #
     neu_gezaehlt <- live_df %>% filter(Gebietstyp == "LD") %>% select(all_of(gezaehlt_i)) %>% pull()
+    #---- Neu ausgezählte Gemeinden und Kreise melden ----
+    ausgezaehlt_df <- live_df %>% 
+      filter(Gebietstyp %in% c("VF","KS","WK")) %>% 
+      filter(`Anzahl Wahlbezirke`==`Anzahl Wahlbezirke ausgezählt`) %>% 
+      select(Gebietsschlüssel,
+             47:53,
+             109:115) 
+    neu_gezaehlt_df <- fertig_df %>% inner_join(ausgezaehlt_df, 
+                                                 by="Gebietsschlüssel") %>%
+      filter(!gemeldet) 
+    fertig_df <- fertig_df %>% 
+      mutate(gemeldet = ifelse(Gebietsschlüssel %in% neu_gezaehlt_df$Gebietsschlüssel,
+                               TRUE,
+                               gemeldet))
     # Nachricht neu gezählte Stimmbezirke
-    teams_meldung("Gezählte Stimmbezirke: ",neu_gezaehlt," (neu: ",neu_gezaehlt-gezaehlt,")")
+    teams_meldung("Gezählte Stimmbezirke: ",neu_gezaehlt," (neu: ",neu_gezaehlt-gezaehlt,")<br><br>",
+                  print(xtable(neu_gezaehlt_df),type="html"))
     gezaehlt <- neu_gezaehlt
   } else {
     # Logfile erneuern und 30 Sekunden schlafen

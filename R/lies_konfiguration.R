@@ -185,27 +185,43 @@ direkt_2018_df <- e2018_df %>%
          ungueltig_prozent = 100 - (gueltig / waehler * 100)) %>%
   # Sonderbedingung: Ganz Hessen = "Wahlkreis 0"
   mutate(wk = if_else(is.na(wk),0,wk))
+  # Gemeindefusion Wesertal: 633021 und 633027 zusammen zu 633030
 
 # Jetzt die Namen umfrickeln
 colnames(direkt_2018_df) <- colnames(direkt_2018_df) %>% 
   str_replace("\\.\\.\\.[0-9]+$","")
 
+
+wesertal_df <- direkt_2018_df %>% filter(AGS %in% c("633021","633027")) %>% 
+  summarize(wk = first(wk),
+            wk_name = "Wesertal",
+            AGS = "633030",
+            across(c(4:28), ~ sum(.))) %>% 
+  mutate(wahlbeteiligung = waehler / wahlberechtigt * 100) %>% 
+  mutate(across(c(4:28),~ as.integer(.)))
+
+direkt_2018_df <- rbind(direkt_2018_df %>% 
+  filter(!(AGS %in% c("633021","633027"))), wesertal_df)
+
+
 # Gemeinden und Städte (hier: noch nicht getrennt)
 gemeinden_direkt_2018_df <- direkt_2018_df %>% 
   filter(!is.na(AGS)) %>%
   # Stimmbezirks-Zeilen ausfiltern; die machen wir diesmal nicht
-  filter(AGS < 1000000) %>% 
-  mutate(AGS = as.character(AGS)) %>% 
+  filter(nchar(AGS) == 6) %>% 
   select(-wk_name) %>% 
   # vernünftige Gemeindenamen und Wahlkreisnamen reinjoinen
   left_join(gemeinden_alle_df %>% select(AGS,name,wk_name), by="AGS") %>% 
   relocate(AGS,name,wk_name) %>% 
   # Mehrfach-Einträge für Städte rauswerfen
   distinct(AGS,name,.keep_all=TRUE)
-  
+
+gemeinden_direkt_2018_lang_df <- gemeinden_direkt_2018_df %>% 
+  pivot_longer(cols=c(11:29),names_to="partei",values_to="stimmen_2018") %>% 
+  mutate(prozent_2018 = stimmen_2018 / gueltig * 100)  
   
 ### Spalten 35-57: Landesstimmen
-  landesstimmen_2018_df <- e2018_df %>%  
+landesstimmen_2018_df <- e2018_df %>%  
   select(wk = 2,
          wk_name = 4,
          AGS = 3, 
@@ -225,20 +241,37 @@ gemeinden_direkt_2018_df <- direkt_2018_df %>%
 
 # Jetzt die Namen umfrickeln
 colnames(landesstimmen_2018_df) <- colnames(landesstimmen_2018_df) %>% 
-  str_replace("\\.\\.\\.[0-9]+$","")
+  str_replace("\\.\\.\\.[0-9]+$","")  
+
+g_wesertal_df <- landesstimmen_2018_df %>% filter(AGS %in% c("633021","633027")) %>% 
+  summarize(wk = first(wk),
+            wk_name = first(wk_name),
+            AGS = "633030",
+            across(c(4:32), ~ sum(.))) %>% 
+  mutate(wahlbeteiligung = waehler / wahlberechtigt * 100)
+
+
+landesstimmen_2018_df <- rbind(landesstimmen_2018_df %>% 
+  filter(!(AGS %in% c("633021","633027"))),g_wesertal_df)
+  
+
+
 
 # Gemeinden und Städte (hier: noch nicht getrennt)
 gemeinden_landesstimmen_2018_df <- landesstimmen_2018_df %>% 
   filter(!is.na(AGS)) %>%
   # Stimmbezirks-Zeilen ausfiltern; die machen wir diesmal nicht
-  filter(AGS < 1000000) %>% 
-  mutate(AGS = as.character(AGS)) %>% 
+  filter(nchar(AGS) == 6) %>% 
   select(-wk_name) %>% 
   # vernünftige Gemeindenamen und Wahlkreisnamen reinjoinen
   left_join(gemeinden_alle_df %>% select(AGS,name,wk_name), by="AGS") %>% 
   relocate(AGS,name,wk_name) %>% 
   # Mehrfach-Einträge für Städte rauswerfen
   distinct(AGS,name,.keep_all=TRUE)
+
+gemeinden_landesstimmen_2018_lang_df <- gemeinden_landesstimmen_2018_df %>% 
+  pivot_longer(cols=c(11:33),names_to="partei",values_to="stimmen_2018") %>% 
+  mutate(prozent_2018 = stimmen_2018 / gueltig * 100) 
 
 # Ganz Hessen? Ganz Hessen!
 hessen_landesstimmen_lang_df <- landesstimmen_2018_df %>% 

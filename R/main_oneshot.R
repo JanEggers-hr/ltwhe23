@@ -28,24 +28,29 @@ Sys.setlocale(locale = "de_DE.UTF-8")
 # Lies Kommandozeilen-Parameter: 
 # (Erweiterte Funktion aus dem R.utils-Paket)
 # Kommandozeilen-Argumente
-TEST = TRUE
+TEST = FALSE
 DO_PREPARE_MAPS = FALSE
+REPUBLISH = FALSE
 
-args = R.utils::commandArgs(asValues = TRUE)
-if (length(args)!=0) { 
-  if (any(c("h","help","HELP") %in% names(args))) {
-    cat("Parameter: \n",
-        "--TEST schaltet Testbetrieb ein\n",
-        "--DO_PREPARE_MAPS schaltet Generierung der Switcher ein\n",
-        "wahl_name=<name> holt Index-Dateien aus dem Verzeichnis ./index/<name>\n\n")
+
+if (dir.exists("/home/jan_eggers_hr_de")) {
+  args = R.utils::commandArgs(asValues = TRUE)
+  if (length(args)!=0) { 
+    if (any(c("h","help","HELP") %in% names(args))) {
+      cat("Parameter: \n",
+          "--TEST schaltet Testbetrieb ein\n",
+          "--DO_PREPARE_MAPS schaltet Generierung der Switcher ein\n",
+          "wahl_name=<name> holt Index-Dateien aus dem Verzeichnis ./index/<name>\n\n")
+    }
+    TEST <- "TEST" %in% names(args)
+    REPUBLISH <- "REPUBLISH" %in% names(args)
+    DO_PREPARE_MAPS <- "DO_PREPARE_MAPS" %in% names(args)
+    if ("wahl_name" %in% names(args)) {
+      wahl_name <- args[["wahl_name"]]
+      if (!dir.exists(paste0("index/",wahl_name))) stop("Kein Index-Verzeichnis für ",wahl_name)
+    }
   }
-  TEST <- "TEST" %in% names(args)
-  DO_PREPARE_MAPS <- "DO_PREPARE_MAPS" %in% names(args)
-  if ("wahl_name" %in% names(args)) {
-    wahl_name <- args[["wahl_name"]]
-    if (!dir.exists(paste0("index/",wahl_name))) stop("Kein Index-Verzeichnis für ",wahl_name)
-  }
-} 
+}
 
 
 
@@ -142,6 +147,7 @@ if (TRUE) {
     write_csv(live_gemeinden_landesstimmen_lang_df,"livedaten/gemeinden_landesstimmen_lang.csv")
     aktualisiere_gemeinden_landesstimmen(live_gemeinden_landesstimmen_lang_df)
     # aktualisiere_staedte_landesstimmen(live_df) Schon mit drin
+    aktualisiere_bucket_gemeinden()
     cat("Grafiken Gemeinde Landesstimmen CSV/JSON aktualisiert\n")
     #
     cat("Aktualisierte Daten kopiert in",aktualisiere_bucket_alle(),"\n")
@@ -162,5 +168,11 @@ if (TRUE) {
 # dw_publish_chart(top_id)
 
 cat("main_oneshot.R fehlerfrei durchgelaufen\n\n")
+
+if (REPUBLISH) {
+  cat("Republiziere alle ",nrow(datawrapper_ids_df)," Grafiken... dauert.\n")
+  republish(datawrapper_ids_df$dw_id)
+}
+
 
 # EOF

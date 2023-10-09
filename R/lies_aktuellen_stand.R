@@ -36,12 +36,22 @@ hole_daten <- function(stand_url,a_directory = "daten", copy=TRUE) {
   # Jetzt vom lokalen Laufwerk einlesen
   check = tryCatch(
     {
-      tmp_df <-read_delim(fname, 
-                           delim = ";", escape_double = FALSE, 
+      tmp_df <-read_csv2(fname, 
                            locale = locale(date_names = "de", 
                                            decimal_mark = ",", 
                                            grouping_mark = "."), 
-                           trim_ws = TRUE, 
+                         col_types=list(
+                           `Wahlkreis gewonnen: Name` = col_character(),
+                           `Wahlkreis gewonnen: Vorname` = col_character(),
+                           `Wahlkreis gewonnen: Titel` = col_character(),
+                           `Wahlkreis gewonnen: Wahlvorschlag` = col_character(),
+                           `Letzte Änderung` = col_character(),
+                           freigegeben = col_double(),
+                           `Nummer aufnehmender Wahlbezirk` = col_character(),
+                           `Name aufnehmender Wahlbezirk` = col_character(),
+                           `Aufnahme Wahlbezirk` = col_double()
+                         ),
+                            trim_ws = TRUE, 
                            skip =1)
     },
     warning = function(w) {teams_warning(w,title=paste0(wahl_name,": Datenakquise - Warnung beim Einlesen von ",fname))},
@@ -104,7 +114,22 @@ check_for_timestamp <- function(my_url) {
   return(t)
 }
 
-
+check_curl <- function(c_url) {
+  # tmp <- curlGetHeaders(my_url, redirect = T, verify = F)
+  # # Redirect 
+  # if (stringr::str_detect(tmp[1]," 404")) {
+  #   library(curl)
+  #   h <- new_handle()
+  #   # Das funktioniert, holt aber alle Daten -> hohe Last
+  #   t <- curl_fetch_memory(my_url,handle=h)$modified %>% 
+  #     as_datetime() + hours(1)
+  # } else {
+  #   t <- tmp[stringr::str_detect(tmp,"last-modified")] %>%
+  #     stringr::str_replace("last-modified: ","") %>%
+  #     parse_date_time("%a, %d %m %Y %H:%M:%S",tz = "CET")
+  #
+  
+}
 #---- Gelesene Daten filtern und aufbereiten ----
 
 #' forme_hessen_landesstimmen
@@ -262,7 +287,7 @@ forme_gemeinden_direkt <- function(live_df) {
     # Offenbach korrigieren
     mutate(wk = ifelse(AGS == "413000",43,wk)) %>% 
     # Namen aus der Namenstabelle überschreibt "Hans-Stadten-Stadt" etc.
-    left_join(gemeinden_alle_df %>% distinct(AGS,name), by="AGS") %>% 
+    left_join(gemeinden_alle_df %>% distinct(AGS,name), by="AGS")%>% 
     mutate(g_name = name) %>% 
     select(-name) %>% 
     # Parteinamen extrahieren - mit V3-Partei!
@@ -271,14 +296,13 @@ forme_gemeinden_direkt <- function(live_df) {
     mutate(prozent = ifelse (stimmen == 0,0,stimmen/gueltig*100)) %>% 
     # Ergänze die (Nach-)Namen der Direktkandidaten
     left_join(direktkandidaten_df %>% select (wk,partei,Nachname,name),
-              by=c("wk","partei"))%>% 
+              by=c("wk","partei"))  %>% 
     # Parteien ausfiltern
     filter(!is.na(name)) %>% 
     # Ergänze 2018er Ergebnisse aus der "Frankentabelle" (Kombination direkte und umgerechnete WK)
-    left_join(frankentable_direkt_lang_df,by=c("wk","partei")) %>% 
-    group_by(wk) %>% 
-    fill(wahlberechtigte_2018:veraendert) %>% 
-    ungroup() %>% 
+    left_join(gemeinden_direkt_2018_lang_df %>% 
+                select(AGS, partei, stimmen_2018, prozent_2018),
+              by=c("AGS","partei")) %>% 
     mutate(across(c(stimmen_2018,prozent_2018), ~ ifelse(is.na(.),0,.)))   %>% 
     mutate(differenz = ifelse(prozent == 0,0,prozent - prozent_2018))
   return(live_gemeinden_direkt_lang_df)
@@ -327,10 +351,12 @@ forme_gemeinden_landesstimmen <- function(live_df) {
     mutate(partei = str_replace(partei," Landesstimmen",""))%>% 
     # Prozentanteil errechnen
     mutate(prozent = ifelse (stimmen == 0,0,stimmen/gueltig*100)) %>% 
-    # Ergänze 2018er Ergebnisse aus der "Frankentabelle" (Kombination direkte und umgerechnete WK)
-    left_join(frankentable_landesstimmen_lang_df,by=c("wk","partei")) %>% 
+    # Ergänze 2018er Ergebnisse in den Gemeinden 
+    left_join(gemeinden_landesstimmen_2018_lang_df %>% 
+                select(AGS, partei, stimmen_2018, prozent_2018),
+              by=c("AGS","partei")) %>% 
     group_by(gs) %>% 
-    fill(wahlberechtigte_2018:veraendert) %>% 
+#    fill(wahlberechtigte_2018:veraendert) %>% 
     ungroup() %>% 
     mutate(across(c(stimmen_2018,prozent_2018), ~ ifelse(is.na(.),0,.)))   %>% 
     mutate(differenz = ifelse(prozent == 0,0,prozent - prozent_2018))
