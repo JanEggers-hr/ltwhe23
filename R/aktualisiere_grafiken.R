@@ -5,6 +5,65 @@
 
 #---- Hauptfunktionen ----
 
+#' aktualisiere_hessen_landesstimmen
+#' 
+#' Grafikausgabe Landesstimmen ganz Hessen (direkt über dw-Publish)
+aktualisiere_hessen_landesstimmen <- function(lhll_df = live_hessen_landesstimmen_lang_df){
+  stimmbezirke <- lhll_df %>% pull(stimmbezirke) %>% first()
+  gezaehlt <- lhll_df %>% pull(gezaehlt) %>% first()
+  waehler <- lhll_df %>% pull(waehler) %>% first()
+  wahlberechtigt <- lhll_df %>% pull(wahlberechtigt) %>% first()
+  ungueltig <- lhll_df %>% pull(ungueltig) %>% first()
+  
+  hessen_df <- lhll_df %>% 
+    mutate(plusminus = ifelse(prozent==0,"(.)",
+                              paste0("(",
+                                     formatC(prozent-prozent_2018,
+                                             digits=1,format="f", flag="+",
+                                             big.mark = ".",decimal.mark = ","),
+                                     ")"
+                              ))) %>% 
+    select(partei,prozent,plusminus)
+  # Daten direkt hochladen
+  dw_data_to_chart(hessen_df,chart_id = hessen_id)
+  title = paste0("Hessen: Landesstimmen",ifelse(stimmbezirke == gezaehlt," - ERGEBNIS"," - TREND (bislang ausgezählte Stimmen)"))
+  intro = paste0("Abgegebene Stimmen: ",
+                 formatC(waehler,format="d",
+                         decimal.mark=",", big.mark="."),
+                 
+                 ", davon ungültig: ",
+                 formatC(ungueltig / waehler * 100,format="f",
+                         decimal.mark=",", digits = 1, big.mark="."),
+                 "%, ",
+                 ifelse(stimmbezirke == gezaehlt,
+                        paste0(
+                          "Wahlbeteiligung: ",
+                          formatC(waehler / wahlberechtigt * 100,format="f",
+                                  decimal.mark=",", digits = 1, big.mark="."),
+                          "%"),
+                        ""),
+                 
+                 "<br><br>Zweitstimmen für die Parteien landesweit; auf Zehntel gerundet. in Klammern die Stimmanteile bei der Landtagswahl 2018, ",
+                 "soweit vorhanden")
+  notes = notes_text_auszaehlung(gezaehlt,
+                                 stimmbezirke,
+                                 ts,
+                                 " Reihenfolge der Parteien wie auf dem Stimmzettel.<br><br>")
+  # TEST-Feature
+  if (TEST) {
+    intro = paste0("<b style='color:#dfedf8;'>TITLE ",title,"<br><br>INTRO ",intro,"</b>")
+    title ="*** TEST *** wk0 - FIKTIVE DATEN"
+  }
+  dw_edit_chart(chart_id = hessen_id,
+                title = title,
+                intro = intro,
+                annotate = notes)
+  dw_publish_chart(chart_id = hessen_id)
+}
+
+
+
+
 
 #' aktualisiere_kreise_direkt
 #' 
@@ -14,7 +73,6 @@
 #' Die Daten sind hier sehr schlicht: Spalten name, prozent
 #' Metadaten ergänzen
 aktualisiere_kreise_direkt <- function(live_kreise_direkt_lang_df, wk_v = c(1:55)) {
-  ausgezaehlt_df <- tibble()
   lkdl_df <- live_kreise_direkt_lang_df
   # Gehe durch die Wahlkreis-IDs und suche die passenden Wahlkreisdaten
   for (i in wk_v) {
@@ -41,20 +99,18 @@ aktualisiere_kreise_direkt <- function(live_kreise_direkt_lang_df, wk_v = c(1:55
       filter(wk == i) %>% 
       mutate(prozent = paste0(formatC(prozent,digits=1,format="f", 
                                       big.mark = ".",decimal.mark = ","),
-                              " (",
-                              formatC(differenz,digits=1,format="f", 
+                              "% (",
+                              ifelse(partei %in% v2018_v,
+                              formatC(differenz,digits=1,format="f",
                                       flag="+", big.mark = ".",decimal.mark = ","),
-                              ")")) %>% 
+                              "?"),
+                              ")"
+                              )
+             ) %>% 
       select(name,partei,stimmen,prozent) 
     write_csv(kand_df %>% head(5),paste0("livedaten/",
                                          fname,
                                          ".csv"))
-    if (gezaehlt == stimmbezirke) {
-      ausgezaehlt_df <- bind_rows(ausgezaehlt_df,
-                                  wahlkreis_df %>% 
-                                    select(wk_name,partei,prozent) %>% 
-                                    pivot_wider(names_from=partei,values_from=prozent))
-    }
     # Metadaten einrichten: 
     wahlbeteiligung_str <- paste0("Abgegebene Stimmen: ",
                                   formatC(waehler,format="d",
@@ -68,14 +124,19 @@ aktualisiere_kreise_direkt <- function(live_kreise_direkt_lang_df, wk_v = c(1:55
                                          paste0(
                                            "Wahlbeteiligung: ",
                                            formatC(waehler / wahlberechtigt * 100,format="f",
-                                                   decimal.mark=",", digits = 1, big.mark="."),
-                                           "%"),
+                                                   decimal.mark=",", digits = 1, big.mark=".")),
                                          ""),
       "<br><br>"
     )
     kand_str <- paste0("Weitere: ",
-                       paste0(kand_df %>% tail(nrow(.)-5) %>% 
-                         mutate(n = paste0(name,": 0,0%")) %>% pull(n),
+                       paste0(kand_df %>% 
+                                tail(nrow(.)-5) %>% 
+                                mutate(nn = paste0(name,": ",
+                                           formatC(prozent, 
+                                                   format = "f",
+                                                   digits=1,
+                                                   decimal.mark = ",",
+                                                   big.mark = ".")))  %>% pull(nn),
                        collapse = ", "),"<br><br>")
     title <- paste0("Wahlkreis ",wk,
                     " - ",wk_name,
@@ -84,7 +145,9 @@ aktualisiere_kreise_direkt <- function(live_kreise_direkt_lang_df, wk_v = c(1:55
                            " - ERGEBNIS",
                            " - TREND (bislang ausgezählte Stimmen)"))
     intro <- paste0(wahlbeteiligung_str,
-                    "Erststimmen für die Wahl des Direktkandidaten im Wahlkreis - die derzeit fünf führenden Kandidatinnen und Kandidaten")
+                    "Erststimmen für die Wahl des Direktkandidaten im Wahlkreis - ",
+                    "die derzeit fünf führenden Kandidatinnen und Kandidaten. ",
+                    "Prozentzahlen auf Zehntel gerundet; in Klammern: Vergleich zu 2018")
     notes <- notes_text_auszaehlung(gezaehlt,
                                     stimmbezirke, 
                                     ts,kand_str,
@@ -152,8 +215,10 @@ aktualisiere_kreise_landesstimmen <- function(live_kreise_landesstimmen_lang_df)
       mutate(prozent = paste0(formatC(prozent,digits=1,format="f", 
                                       big.mark = ".",decimal.mark = ","),
                               " (",
-                              formatC(differenz,digits=1,format="f", 
+                              ifelse(partei %in% v2018_v,
+                                     formatC(differenz,digits=1,format="f", 
                                       flag="+", big.mark = ".",decimal.mark = ","),
+                                     "?"),
                               ")")) %>% 
       select(partei,stimmen,prozent,wk)
     write_csv(liste_df,paste0("livedaten/",
@@ -184,8 +249,8 @@ aktualisiere_kreise_landesstimmen <- function(live_kreise_landesstimmen_lang_df)
                            " - ERGEBNIS",
                            " - TREND (bislang ausgezählte Stimmen)"))
     intro <- paste0(wahlbeteiligung_str,
-                    "Zweitstimmen im Wahlkreis für die Parteien im neuen Landtag",
-                    " (in Klammern: Ergebnis 2018, soweit vorhanden)")
+                    "Zweitstimmen im Wahlkreis für die Parteien im neuen Landtag. ",
+                    "Prozentzahlen auf Zehntel gerundet; in Klammern: Vergleich zu 2018")
     notes <- notes_text_auszaehlung(gezaehlt,
                                     stimmbezirke, 
                                     ts,
@@ -282,8 +347,9 @@ aktualisiere_gemeinden_direkt <- function(live_gemeinden_direkt_lang_df) {
     intro <- paste0(wahlbeteiligung_str,
                     "Erststimmen in ",
                     g_name, 
-                    " für die Direktkandidaten im Wahlkreis ",wk,
-                    " (in Klammern: Ergebnis 2018, soweit vorhanden)")
+                    " für die Direktkandidaten im Wahlkreis ",wk,". ",
+                    "Prozentzahlen auf Zehntel gerundet; in Klammern: Vergleich zu 2018"
+                    )
     notes <- notes_text_auszaehlung(gezaehlt,
                                     stimmbezirke, 
                                     ts,"in der Reihenfolge vom Stimmzettel<br><br>")
@@ -380,7 +446,8 @@ aktualisiere_gemeinden_landesstimmen <- function(live_gemeinden_landesstimmen_la
     intro <- paste0(wahlbeteiligung_str,
                     "Zweitstimmen in ",g_name,
                     ", alle Wahllisten. ",
-                    "Werte in Klammern geben die Differenz zur letzten Wahl 2018 an.")
+                    "Prozentzahlen auf Zehntel gerundet; in Klammern: Vergleich zu 2018"
+                    )
     notes <- notes_text_auszaehlung(gezaehlt,
                                     stimmbezirke, 
                                     ts,"in der Reihenfolge vom Stimmzettel<br><br>")
@@ -411,64 +478,6 @@ aktualisiere_gemeinden_landesstimmen <- function(live_gemeinden_landesstimmen_la
 # aktualisiere_staedte_landesstimmen <- function(live_df){
 #   
 # }
-
-#' aktualisiere_hessen_landesstimmen
-#' 
-#' Grafikausgabe Landesstimmen ganz Hessen (direkt über dw-Publish)
-aktualisiere_hessen_landesstimmen <- function(lhll_df = live_hessen_landesstimmen_lang_df){
-  stimmbezirke <- lhll_df %>% pull(stimmbezirke) %>% first()
-  gezaehlt <- lhll_df %>% pull(gezaehlt) %>% first()
-  waehler <- lhll_df %>% pull(waehler) %>% first()
-  wahlberechtigt <- lhll_df %>% pull(wahlberechtigt) %>% first()
-  ungueltig <- lhll_df %>% pull(ungueltig) %>% first()
-  
-  hessen_df <- lhll_df %>% 
-    mutate(plusminus = ifelse(prozent==0,"(.)",
-                              paste0("(",
-                                     formatC(prozent-prozent_2018,
-                                             digits=1,format="f", flag="+",
-                                             big.mark = ".",decimal.mark = ","),
-                                     ")"
-                                     ))) %>% 
-    select(partei,prozent,plusminus)
-  # Daten direkt hochladen
-  dw_data_to_chart(hessen_df,chart_id = hessen_id)
-  title = paste0("Hessen: Landesstimmen",ifelse(stimmbezirke == gezaehlt," - ERGEBNIS"," - TREND (bislang ausgezählte Stimmen)"))
-  intro = paste0("Abgegebene Stimmen: ",
-                 formatC(waehler,format="d",
-                         decimal.mark=",", big.mark="."),
-                 
-                 ", davon ungültig: ",
-                 formatC(ungueltig / waehler * 100,format="f",
-                         decimal.mark=",", digits = 1, big.mark="."),
-                 "%, ",
-                 ifelse(stimmbezirke == gezaehlt,
-                        paste0(
-                          "Wahlbeteiligung: ",
-                          formatC(waehler / wahlberechtigt * 100,format="f",
-                                  decimal.mark=",", digits = 1, big.mark="."),
-                          "%"),
-                        ""),
-                 
-    "<br><br>Zweitstimmen für die Parteien landesweit; in Klammern die Stimmanteile bei der Landtagswahl 2018, ",
-    "soweit vorhanden")
-  notes = notes_text_auszaehlung(gezaehlt,
-                                 stimmbezirke,
-                                 ts,
-                                 " Reihenfolge der Parteien wie auf dem Stimmzettel.<br><br>")
-  # TEST-Feature
-  if (TEST) {
-    intro = paste0("<b style='color:#dfedf8;'>TITLE ",title,"<br><br>INTRO ",intro,"</b>")
-    title ="*** TEST *** wk0 - FIKTIVE DATEN"
-  }
-  dw_edit_chart(chart_id = hessen_id,
-                title = title,
-                intro = intro,
-                annotate = notes)
-  dw_publish_chart(chart_id = hessen_id)
-}
-
-
 
 #--- Grafikfunktionen ----
 generiere_auszählungsbalken <- function(anz = gezaehlt,max_s = stimmbezirke_n,ts = ts) {
@@ -656,7 +665,8 @@ gemeinden_landesstimme_tabelle <- function() {
     
     title <- paste0(gemeinde_name, ": Landesstimmen")
     intro <- paste0("Zweitstimmen in ",gemeinde_name,", alle Wahllisten, in der Reihenfolge vom Wahlzettel. ",
-                    "Werte in Klammern geben die Differenz zur letzten Wahl 2018 an.")
+                    "Prozentzahlen auf Zehntel gerundet; in Klammern: Vergleich zu 2018"
+                    )
     # Metadaten anlegen
     forced_meta <- list()
     forced_meta[["title"]] <- title
@@ -735,7 +745,8 @@ staedte_landesstimme_tabelle <- function() {
     intro <- paste0("Zweitstimmen in ",gemeinde_name,", alle Wahlkreise (",
                     paste0(wk,collapse=", "),") -",
                       " Alle Wahllisten, in der Reihenfolge vom Wahlzettel. ",
-                    "Werte in Klammern geben die Differenz zur letzten Wahl 2018 an.")
+                    "Prozentzahlen auf Zehntel gerundet; in Klammern: Vergleich zu 2018"
+                    )
     # Metadaten anlegen
     forced_meta <- list()
     forced_meta[["title"]] <- title
@@ -819,7 +830,8 @@ gemeinden_direkt_tabelle <- function() {
     
     
     title <- paste0(gemeinde_name, ": Stimmen fürs Direktmandat")
-    intro <- paste0("Erststimmen in ",gemeinde_name," für die Wahl des Direktkandidaten des Wahlkreises ", wk)
+    intro <- paste0("Erststimmen in ",gemeinde_name," für die Wahl des Direktkandidaten des Wahlkreises ", wk,". ",
+                    "Prozentzahlen auf Zehntel gerundet; in Klammern: Vergleich zu 2018")
     # Metadaten anlegen
     forced_meta <- list()
     forced_meta[["title"]] <- title

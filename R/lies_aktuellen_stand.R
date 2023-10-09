@@ -145,9 +145,9 @@ forme_hessen_landesstimmen <- function(live_df){
            wahlberechtigt = 6,
            waehler = 10,
            wahlbeteiligung = 12,
-           gueltig = 15,
-           ungueltig = 14,
-           ungueltig_prozent = 17, 
+           gueltig = 77,
+           ungueltig = 76,
+           ungueltig_prozent = 78, 
            all_of(spaltenindex_landesstimmen_df$idx) 
     ) %>% 
     mutate(wk = as.integer(str_sub(wk,1,3))) %>% 
@@ -156,7 +156,7 @@ forme_hessen_landesstimmen <- function(live_df){
     # Parteinamen korrigieren
     mutate(partei = str_replace(partei," Landesstimmen",""))%>% 
     # Prozentanteil errechnen
-    mutate(prozent = ifelse (stimmen == 0,0,stimmen/gueltig*100)) %>% 
+    mutate(prozent = ifelse (stimmen == 0,0,(stimmen/gueltig*100))) %>% 
     left_join(frankentable_landesstimmen_lang_df %>%  
                 filter(wk == 0) %>% 
                 select(partei,prozent_2018),
@@ -196,7 +196,7 @@ forme_kreise_direkt <- function(live_df) {
     # Parteinamen korrigieren
     mutate(partei = str_replace(partei," Wahlkreisstimmen",""))%>% 
     # Prozentanteil errechnen
-    mutate(prozent = ifelse (stimmen == 0,0,stimmen/gueltig*100)) %>% 
+    mutate(prozent = ifelse (stimmen == 0,0,(stimmen/gueltig*100))) %>% 
     # Ergänze die (Nach-)Namen der Direktkandidaten
     left_join(direktkandidaten_df %>% select (wk,partei,Nachname,name),
                by=c("wk","partei"))  %>% 
@@ -231,9 +231,9 @@ forme_kreise_landesstimmen <- function(live_df) {
            wahlberechtigt = 6,
            waehler = 10,
            wahlbeteiligung = 12,
-           gueltig = 15,
-           ungueltig = 14,
-           ungueltig_prozent = 17, 
+           gueltig = 77,
+           ungueltig = 76,
+           ungueltig_prozent = 78, 
            all_of(spaltenindex_landesstimmen_df$idx)
     ) %>% 
     mutate(wk = as.integer(str_sub(wk,1,3))) %>% 
@@ -242,7 +242,10 @@ forme_kreise_landesstimmen <- function(live_df) {
     # Parteinamen korrigieren
     mutate(partei = str_replace(partei," Landesstimmen",""))%>% 
     # Prozentanteil errechnen
-    mutate(prozent = ifelse (stimmen == 0,0,stimmen/gueltig*100)) %>% 
+    mutate(prozent = ifelse (stimmen == 0,
+                             0, 
+                             (stimmen/gueltig*100))
+           ) %>% 
   # Ergänze 2018er Ergebnisse aus der "Frankentabelle" (Kombination direkte und umgerechnete WK)
   left_join(frankentable_landesstimmen_lang_df,by=c("wk","partei")) %>% 
     group_by(wk) %>% 
@@ -293,7 +296,11 @@ forme_gemeinden_direkt <- function(live_df) {
     # Parteinamen extrahieren - mit V3-Partei!
     mutate(partei = str_replace(partei," Wahlkreisstimmen",""))%>% 
     # Prozentanteil errechnen
-    mutate(prozent = ifelse (stimmen == 0,0,stimmen/gueltig*100)) %>% 
+    mutate(prozent = ifelse (stimmen == 0,
+                             0,
+                             (stimmen/gueltig*100)
+                             )
+           ) %>% 
     # Ergänze die (Nach-)Namen der Direktkandidaten
     left_join(direktkandidaten_df %>% select (wk,partei,Nachname,name),
               by=c("wk","partei"))  %>% 
@@ -304,7 +311,9 @@ forme_gemeinden_direkt <- function(live_df) {
                 select(AGS, partei, stimmen_2018, prozent_2018),
               by=c("AGS","partei")) %>% 
     mutate(across(c(stimmen_2018,prozent_2018), ~ ifelse(is.na(.),0,.)))   %>% 
-    mutate(differenz = ifelse(prozent == 0,0,prozent - prozent_2018))
+    mutate(differenz = ifelse(prozent == 0,
+                              0,
+                              prozent - prozent_2018))
   return(live_gemeinden_direkt_lang_df)
   # Filtere Kreise
   
@@ -329,9 +338,9 @@ forme_gemeinden_landesstimmen <- function(live_df) {
            wahlberechtigt = 6,
            waehler = 10,
            wahlbeteiligung = 12,
-           gueltig = 15,
-           ungueltig = 14,
-           ungueltig_prozent = 17, 
+           gueltig = 77,
+           ungueltig = 76,
+           ungueltig_prozent = 78, 
            all_of(spaltenindex_landesstimmen_df$idx)
     ) %>% 
     # Nur die Parteien von den Landeslisten
@@ -350,7 +359,11 @@ forme_gemeinden_landesstimmen <- function(live_df) {
   # Parteinamen korrigieren
     mutate(partei = str_replace(partei," Landesstimmen",""))%>% 
     # Prozentanteil errechnen
-    mutate(prozent = ifelse (stimmen == 0,0,stimmen/gueltig*100)) %>% 
+    mutate(prozent = ifelse (stimmen == 0,
+                             0,
+                             (stimmen/gueltig*100) 
+                             )
+           ) %>% 
     # Ergänze 2018er Ergebnisse in den Gemeinden 
     left_join(gemeinden_landesstimmen_2018_lang_df %>% 
                 select(AGS, partei, stimmen_2018, prozent_2018),
@@ -359,7 +372,9 @@ forme_gemeinden_landesstimmen <- function(live_df) {
 #    fill(wahlberechtigte_2018:veraendert) %>% 
     ungroup() %>% 
     mutate(across(c(stimmen_2018,prozent_2018), ~ ifelse(is.na(.),0,.)))   %>% 
-    mutate(differenz = ifelse(prozent == 0,0,prozent - prozent_2018))
+    mutate(differenz = ifelse(prozent == 0,
+                              0,
+                              prozent - prozent_2018))
   return(live_gemeinden_landesstimmen_lang_df)
   # Filtere Kreise
   

@@ -4,7 +4,10 @@
 .Ruserdata
 .DS_Store
 .gitignore
-algorithmwatch
+analysen/*
+livedaten/*
+livedaten-backup/*
+algorithmwatch/*
 ltwhe.log
 ltwhe_success.log
 ltwhe_crash.log

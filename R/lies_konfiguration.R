@@ -137,7 +137,7 @@ frankentable_direkt_lang_df <- frankentable_direkt_df %>%
          veraendert,
          partei,
          stimmen_2018) %>% 
-  mutate(prozent_2018 = stimmen_2018 / gueltig_2018 * 100)
+  mutate(prozent_2018 = (stimmen_2018 / gueltig_2018 * 1000)/10)
 
 frankentable_landesstimmen_lang_df <- frankentable_landesstimmen_df %>% 
   pivot_longer(cols=9:21,
@@ -150,7 +150,7 @@ frankentable_landesstimmen_lang_df <- frankentable_landesstimmen_df %>%
          veraendert,
          partei,
          stimmen_2018) %>% 
-  mutate(prozent_2018 = stimmen_2018 / gueltig_2018 * 100)
+  mutate(prozent_2018 = (stimmen_2018 / gueltig_2018 * 1000) /10)
 
 
 # Gemeinde-Ergebnisse laden
@@ -218,7 +218,7 @@ gemeinden_direkt_2018_df <- direkt_2018_df %>%
 
 gemeinden_direkt_2018_lang_df <- gemeinden_direkt_2018_df %>% 
   pivot_longer(cols=c(11:29),names_to="partei",values_to="stimmen_2018") %>% 
-  mutate(prozent_2018 = stimmen_2018 / gueltig * 100)  
+  mutate(prozent_2018 = (stimmen_2018 / gueltig * 1000)/10)  
   
 ### Spalten 35-57: Landesstimmen
 landesstimmen_2018_df <- e2018_df %>%  
@@ -271,7 +271,7 @@ gemeinden_landesstimmen_2018_df <- landesstimmen_2018_df %>%
 
 gemeinden_landesstimmen_2018_lang_df <- gemeinden_landesstimmen_2018_df %>% 
   pivot_longer(cols=c(11:33),names_to="partei",values_to="stimmen_2018") %>% 
-  mutate(prozent_2018 = stimmen_2018 / gueltig * 100) 
+  mutate(prozent_2018 = (stimmen_2018 / gueltig * 1000)/10)
 
 # Ganz Hessen? Ganz Hessen!
 hessen_landesstimmen_lang_df <- landesstimmen_2018_df %>% 
@@ -280,7 +280,7 @@ hessen_landesstimmen_lang_df <- landesstimmen_2018_df %>%
   pivot_longer(cols = 9:31,
                names_to = "partei",
                values_to = "stimmen") %>% 
-  mutate(prozent = stimmen / gueltig * 100)
+  mutate(prozent = (stimmen / gueltig * 1000)/10)
 
 
 # Direktkandidaten
@@ -300,4 +300,8 @@ direktkandidaten_df <- kandidaten_alle_df %>%
 # Kassel, Darmstadt, Frankfurt, Wiesbaden - die KF mit mehr als einem Wahlkreis
 # Offenbach wird als Gemeinde in einem Wahlkreis behandelt (der halt nur eine Gemeinde hat)
 staedte_v <- c("611000","411000","412000","414000")
+
+# Parteien, für die es Frankentable-Vergleichswerte gibt
+v2018_v <- colnames(frankentable_direkt_df)[9:20]
+
          

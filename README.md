@@ -29,6 +29,8 @@ Die Daten müssen dafür über ein CSV angeliefert werden, das auf dem Bucket li
 dessen Adresse die Datawrapper-Grafik kennt, und das überschrieben wird, wenn etwas aktualisiert
 werden soll. Details hier: https://academy.datawrapper.de/article/60-external-data-sources
 
+### Lösung: CSV- und JSON-Livedaten in Datawrapper
+
 Schöner ist die zusätzliche Möglichkeit, ein JSON mit zusätzlichen Metadaten-Keys zu hinterlegen, 
 dessen Inhalt die Datawrapper-Grafik genau so zieht wie die Daten - zum Beipsiel für 
 einen angepassten Titel, einen Fortschrittsbalken für die ausgezählten Stimmbezirke und einen
@@ -39,6 +41,32 @@ Wenn die Grafiken nicht neu veröffentlicht werden müssen, sondern man nur die 
 CSV- und JSON-Dateien generieren und uploaden muss, ist ein Auswertungs-Zyklus in unter einer
 Minute erledigt - auf jeden Fall schnell genug, um die nächste Aktualisierung mitzubekommen.
 
+### Generierung und Anpassung der Datawrapper-Grafiken
+
+Das Anlegen der Grafiken erfolgte automatisiert - wie auch sonst - , allerdings 
+habe ich es für effizienter gehalten, nicht jeden einzelnen Key anzupassen, weil Datawrapper
+zum Teil ganze Serien von Parametern braucht, um richtig zu antworten. (Beispiel: 
+column-Parameter zum Umgang mit Datenreihen).
+
+Workflow war also: 
+- Anpassung von Muster-Datawrapper-Grafiken von Hand...
+- ...ergänzt von automatisch generierten Farbtabellen für die Parteien
+- Eintrag der CSV- und JSON-Datei-URLs automatisiert; Anpassung von Keys
+
+### Datawrapper-Grafiken für Live-Update einrichten via API
+
+Damit eine Grafik die externen Daten nutzt, muss man per API fünf(!) Keys eintragen - 
+siehe Funktion fix_dwcdn() in der Datei aktualisiere_grafiken.R: 
+
+```
+    data$`use-datawrapper-cdn`<- FALSE
+    data$`upload-method`= "external-data"
+    data$`external-data` = "<dateiname>.csv"
+    data$`external-metadata` = "<dateiname>.json"
+    
+    #...und wichtig: ein zusätzlicher Key auf der Ebene content
+    dw_edit_chart(chart_id = did, data = data, externalData = ext_path)
+```
 
 ## Drumherum ##
 

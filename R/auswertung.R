@@ -52,7 +52,7 @@ check = tryCatch(
 
 
 
-ts <- ts_daten
+#ts <- ts_daten
 # Alles live mit Tabelle und 
 live_df <- hole_daten(stimmbezirke_url)
 stimmbezirke_n <- live_df %>% filter(Gebietstyp == "LD") %>% select(all_of(stimmbezirke_i)) %>% pull()
@@ -107,6 +107,9 @@ gewinn_verlust_df <- gemeinden_parteien_df %>%
   arrange(id) 
 
 write.xlsx(gewinn_verlust_df,"analysen/gewinn_verlust.xlsx", overwrite=T)
+library(DatawRappr)
+dw_data_to_chart(chart_id = "s4jvc", gewinn_verlust_df)
+dw_publish_chart(chart_id = "s4jvc")
 
 parteien <- createWorkbook()
 for (p in parteien_idx_df$partei) {
@@ -203,3 +206,45 @@ choro_alle_df <- gemeinden_parteien_df %>%
 
 write.xlsx(choro_alle_df,"analysen/choropleth_alle.xlsx")
 
+# Alle DW-Grafiken
+dw_c_v <- c("sa8zh", #AfD
+            "BFQBy", #CDU
+            "COpbT", #DIE LINKE
+            "qTsRa", #FDP
+            "kyHjZ", #FREIE WÄHLER
+            "q6YsR", #GRÜNE
+            "n1Z0P", #SPD,
+            "XUgAd")  #Volatilität 
+        
+
+for (dw_id in dw_c_v) {
+  dw_data_to_chart(chart_id = dw_id,choro_alle_df)
+  dw_publish_chart(chart_id = dw_id)
+}
+
+#---- Briefwahl ----
+stimm_df <- live_df %>% 
+  filter(Gebietstyp == "SB") %>% 
+  mutate(briefwahl = (str_sub(Wahlbezirksnummer,1,2) %in% c("90","09","99")) | str_detect(Wahllokal,"Briefwahl")) %>%  
+  mutate(AGS = str_sub(Gebietsschlüssel,4,9)) %>% 
+  select(AGS,
+         g_name = Gebietsbezeichnung,
+    wahlberechtigt = Wahlberechtigte,
+    waehler = `Wählerinnen und Wähler`,
+    ungueltig_wk = `ungültige Wahlkreisstimmen`,
+    ungueltig_ls = `ungültige Landesstimmen`,
+    briefwahl) %>% 
+  group_by(AGS) %>% 
+  mutate(anzahl = n()) %>% 
+  filter(!is.na(waehler)) %>% 
+  mutate(bw = ifelse(briefwahl,waehler,0)) %>% 
+  summarize(g_name = first(g_name),
+            wahlberechtigt = sum(wahlberechtigt),
+            waehler = sum(waehler),
+            briefwaehler = sum(bw),
+            ungueltig_wk = sum(ungueltig_wk),
+            ungueltig_ls = sum(ungueltig_ls)) %>% 
+  mutate(briefwahlquote = (briefwaehler / waehler *1000) / 10) 
+
+briefwahlquote <- (sum(stimm_df$briefwaehler) / sum(stimm_df$waehler) *1000) / 10
+write.xlsx(stimm_df,"analysen/briefwahl_nach_gemeinde.xlsx")
